@@ -80,7 +80,7 @@ st.markdown(
 )
 
 st.title("Tamil Nadu Fertility Clinic Market – Executive Dashboard")
-st.caption("Clinics_Final_Stemmed.csv • Confidential • For CEO / Owners / HR")
+st.caption("Clinics_Final_Stemmed.csv • Confidential • For Embryologists")
 
 st.markdown("---")
 
