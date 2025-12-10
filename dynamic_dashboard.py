@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import folium
 from streamlit_folium import st_folium
 
@@ -11,17 +12,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------- DATA LOAD ----------
-@st.cache_data
+# ---------- DATA LOAD (PUBLIC LINK METHOD) ----------
+# ttl=10 means "check for updates every 10 seconds"
+@st.cache_data(ttl=10)
 def load_data():
+    # -------------------------------------------------------------
+    # 1. PASTE YOUR GOOGLE SHEET LINK BELOW
+    # -------------------------------------------------------------
+    sheet_url = "https://docs.google.com/spreadsheets/d/1Yb07Bkkxj6PXCLGe2_2Wn7IxHuPxHiKpXWxSENFW8_k/export?format=csv" 
+    
+    # -------------------------------------------------------------
+    # AUTOMATIC URL CONVERTER
+    # This logic converts a standard Google Sheet link into a CSV export link
+    # -------------------------------------------------------------
     try:
-        df = pd.read_csv("Clinics_Final_Stemmed.csv")
-    except FileNotFoundError:
-        st.error("File 'Clinics_Final_Stemmed.csv' not found. Please place it in the same directory.")
+        if "docs.google.com" in sheet_url:
+            # Replace /edit... with /export?format=csv
+            csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv")
+            csv_url = csv_url.replace("/edit", "/export?format=csv")
+        else:
+            # If it's already a direct CSV link or local file
+            csv_url = sheet_url
+
+        # Read the data
+        df = pd.read_csv(csv_url)
+        
+    except Exception as e:
+        st.error(f"⚠️ Error loading data. Please ensure the Google Sheet is set to 'Anyone with the link'.\nError details: {e}")
         return pd.DataFrame() 
     
     # --- DATA CLEANING ---
-    # 1. Standardize Clinic Type (Fix "Another Independent" issue)
+    # 1. Standardize Clinic Type
     if "Clinic_Type" in df.columns:
         df["Clinic_Type"] = df["Clinic_Type"].astype(str).str.strip().str.title()
     
@@ -37,6 +58,7 @@ def load_data():
 
 df = load_data()
 
+# Stop if data failed to load
 if df.empty:
     st.stop()
 
@@ -135,7 +157,7 @@ with col_map:
 
     if not geo_data.empty:
         tn_center = [11.1271, 78.6569]
-        m = folium.Map(location=tn_center, zoom_start=7, tiles=None) # tiles=None is crucial
+        m = folium.Map(location=tn_center, zoom_start=7, tiles=None)
 
         # Google Maps Layer
         folium.TileLayer(
@@ -176,34 +198,23 @@ with col_brand:
 
 st.markdown("---")
 
-# ---------- TABLE 1: BRAND HEADQUARTERS (FIXED) ----------
+# ---------- TABLE 1: BRAND HEADQUARTERS ----------
 st.subheader("🏢 Brand Headquarters")
 
-# 1. Get the list of brands currently visible in the dashboard (from filters)
 visible_brands = filtered[filtered["Clinic_Type"] == "Chained"]["Brand_name"].unique()
 
-# 2. Look up the HQ address from the MASTER dataset (df)
-#    This ensures we find the HQ address even if the specific rows in 'filtered' (e.g. filtered by district) don't have it.
 if "HQ" in df.columns:
-    # Get all Chained brands from the full file
     master_hq = df[df["Clinic_Type"] == "Chained"]
-    
-    # Create a reference table of Brand -> HQ
-    # dropna() removes rows with no HQ address
-    # drop_duplicates() ensures we only have ONE row per brand
     hq_reference = master_hq[["Brand_name", "HQ"]].dropna().drop_duplicates(subset=["Brand_name"])
-    
-    # 3. Filter this reference table to only show brands the user has selected/filtered
     final_hq_table = hq_reference[hq_reference["Brand_name"].isin(visible_brands)].sort_values("Brand_name")
     
     st.dataframe(final_hq_table, use_container_width=True, hide_index=True)
-
 else:
-    st.error("⚠️ Column 'HQ' not found. Please ensure your CSV has a column named 'HQ' for this table.")
+    st.warning("⚠️ Column 'HQ' not found. Check your CSV headers.")
 
 st.markdown("---")
 
-# ---------- TABLE 2: DETAILED LIST (With Google_Full_Address) ----------
+# ---------- TABLE 2: DETAILED LIST ----------
 st.subheader("🏥 Detailed Clinic List")
 
 cols_wanted = ["Clinic Name", "Google_Full_Address", "Email", "Mapped_District"]
