@@ -18,7 +18,7 @@ def load_data():
     # -------------------------------------------------------------
     # 1. PASTE YOUR GOOGLE SHEET LINK BELOW
     # -------------------------------------------------------------
-    sheet_url = "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1Yb07Bkkxj6PXCLGe2_2Wn7IxHuPxHiKpXWxSENFW8_k/edit?usp=sharing" 
     
     # -------------------------------------------------------------
     # AUTOMATIC URL CONVERTER
