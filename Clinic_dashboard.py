@@ -13,28 +13,23 @@ st.set_page_config(
 )
 
 # ---------- DATA LOAD (PUBLIC LINK METHOD) ----------
-# ttl=10 means "check for updates every 10 seconds"
 @st.cache_data(ttl=10)
 def load_data():
     # -------------------------------------------------------------
     # 1. PASTE YOUR GOOGLE SHEET LINK BELOW
     # -------------------------------------------------------------
-    sheet_url = "https://docs.google.com/spreadsheets/d/1Yb07Bkkxj6PXCLGe2_2Wn7IxHuPxHiKpXWxSENFW8_k/export?format=csv" 
+    sheet_url = "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE" 
     
     # -------------------------------------------------------------
     # AUTOMATIC URL CONVERTER
-    # This logic converts a standard Google Sheet link into a CSV export link
     # -------------------------------------------------------------
     try:
         if "docs.google.com" in sheet_url:
-            # Replace /edit... with /export?format=csv
             csv_url = sheet_url.replace("/edit?usp=sharing", "/export?format=csv")
             csv_url = csv_url.replace("/edit", "/export?format=csv")
         else:
-            # If it's already a direct CSV link or local file
             csv_url = sheet_url
 
-        # Read the data
         df = pd.read_csv(csv_url)
         
     except Exception as e:
@@ -58,7 +53,6 @@ def load_data():
 
 df = load_data()
 
-# Stop if data failed to load
 if df.empty:
     st.stop()
 
@@ -94,7 +88,7 @@ st.markdown(f"""
 st.title("🏥 Tamil Nadu Fertility Clinic Market")
 st.divider()
 
-# ---------- FILTERS ----------
+# ---------- FILTERS (TOP) ----------
 col_f1, col_f2, col_f3 = st.columns(3)
 
 # Filter 1: Type
@@ -112,8 +106,8 @@ with col_f2:
 
 # Filter 3: Brand
 with col_f3:
-    available_brands = sorted(temp_df[temp_df["Clinic_Type"] == "Chained"]["Brand_name"].dropna().unique())
-    selected_brands = st.multiselect("Brand", options=available_brands, placeholder="All Brands") if "Chained" in selected_types else []
+    available_brands = sorted(temp_df["Brand_name"].dropna().unique())
+    selected_brands = st.multiselect("Brand", options=available_brands, placeholder="All Brands")
 
 # Apply Filters
 filtered = df[df["Clinic_Type"].isin(selected_types)]
@@ -159,7 +153,6 @@ with col_map:
         tn_center = [11.1271, 78.6569]
         m = folium.Map(location=tn_center, zoom_start=7, tiles=None)
 
-        # Google Maps Layer
         folium.TileLayer(
             tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
             attr='Google',
@@ -190,9 +183,8 @@ with col_map:
 
 with col_brand:
     st.subheader("Top Brands")
-    chained = filtered[filtered["Clinic_Type"] == "Chained"]
-    if not chained.empty:
-        top_brands = chained["Brand_name"].value_counts().head(10).reset_index()
+    if not filtered.empty:
+        top_brands = filtered["Brand_name"].value_counts().head(10).reset_index()
         fig = px.bar(top_brands, x="Brand_name", y="count", template=plotly_template)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -201,27 +193,40 @@ st.markdown("---")
 # ---------- TABLE 1: BRAND HEADQUARTERS ----------
 st.subheader("🏢 Brand Headquarters")
 
-visible_brands = filtered[filtered["Clinic_Type"] == "Chained"]["Brand_name"].unique()
+visible_brands = filtered["Brand_name"].unique()
 
 if "HQ" in df.columns:
-    master_hq = df[df["Clinic_Type"] == "Chained"]
-    hq_reference = master_hq[["Brand_name", "HQ"]].dropna().drop_duplicates(subset=["Brand_name"])
+    hq_reference = df[["Brand_name", "HQ"]].dropna().drop_duplicates(subset=["Brand_name"])
     final_hq_table = hq_reference[hq_reference["Brand_name"].isin(visible_brands)].sort_values("Brand_name")
-    
     st.dataframe(final_hq_table, use_container_width=True, hide_index=True)
 else:
     st.warning("⚠️ Column 'HQ' not found. Check your CSV headers.")
 
 st.markdown("---")
 
-# ---------- TABLE 2: DETAILED LIST ----------
+# ---------- TABLE 2: DETAILED LIST WITH SEARCH (NEW!) ----------
 st.subheader("🏥 Detailed Clinic List")
 
-cols_wanted = ["Clinic Name", "Google_Full_Address", "Email", "Mapped_District"]
+# 1. Search Bar
+search_query = st.text_input("🔍 Search Clinic, District, or Brand", placeholder="Type to search... (e.g., 'Apollo' or 'Chennai')")
+
+cols_wanted = ["Clinic Name", "Google_Full_Address", "Email", "Mapped_District", "Brand_name"]
 valid_cols = [c for c in cols_wanted if c in filtered.columns]
 
+# 2. Filter Logic based on search
+if search_query:
+    # Check if the search query exists in ANY of the visible columns
+    # We convert everything to string (.astype(str)) and lowercase (.str.lower()) for easy matching
+    mask = filtered[valid_cols].apply(
+        lambda row: row.astype(str).str.lower().str.contains(search_query.lower()).any(), axis=1
+    )
+    table_to_show = filtered[mask]
+else:
+    table_to_show = filtered
+
+# 3. Show Table
 st.dataframe(
-    filtered[valid_cols].sort_values("Mapped_District"),
+    table_to_show[valid_cols].sort_values("Mapped_District"),
     use_container_width=True,
     hide_index=True
 )
